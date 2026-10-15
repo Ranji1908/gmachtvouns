@@ -721,7 +721,7 @@ footer nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
           </button>
         </div>
         <p class="status" id="status" role="status"></p>
-        <p class="fine" style="margin:0">Du bekommst eine Kopie deiner Anfrage per E-Mail. Deine Angaben nutzen wir nur, um dir zu antworten. Der Versand läuft über den Dienst FormSubmit.</p>
+        <p class="fine" style="margin:0">Deine Angaben nutzen wir nur, um dir zu antworten. Der Versand läuft über den Dienst FormSubmit.</p>
       </div>
     </form>
   </div>
@@ -881,7 +881,7 @@ footer nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json.success === false || json.success === "false") throw new Error(json.message || res.status);
-      form.innerHTML = '<div class="danke" role="status"><p class="hand" style="font-size:1.8rem;margin:0">Vergelt’s Gott!</p><h3>Deine Anfrage ist bei uns angekommen.</h3><p>Eine Kopie haben wir dir an <strong></strong> geschickt. Wir melden uns in ein, zwei Tagen.</p></div>';
+      form.innerHTML = '<div class="danke" role="status"><p class="hand" style="font-size:1.8rem;margin:0">Vergelt’s Gott!</p><h3>Deine Anfrage ist bei uns angekommen.</h3><p>Wir melden uns in ein, zwei Tagen bei dir unter <strong></strong>.</p></div>';
       form.querySelector("strong").textContent = email;
       form.scrollIntoView({ behavior: "smooth", block: "center" });
     } catch (err) {
