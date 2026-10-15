@@ -299,7 +299,11 @@ textarea { min-height: 7rem; resize: vertical; }
 .summe small { color: var(--muted); display: block; }
 .send { display: grid; gap: var(--s3); }
 .send .btn-row .btn { flex: 1 1 12rem; }
-.status { font-weight: 600; color: var(--salbei); min-height: 1.4em; }
+.status { font-weight: 600; color: var(--salbei); min-height: 1.4em; white-space: pre-line; }
+.status.fehler { color: var(--rot); }
+.danke { display: grid; gap: var(--s3); padding: var(--s5) var(--s4); background: var(--tag); border-radius: 10px; text-align: left; }
+.danke h3 { font-size: 1.8rem; }
+button[disabled] { opacity: .6; cursor: wait; }
 .kontakt-alt { display: grid; gap: var(--s3); margin-top: var(--s4); }
 .kontakt-alt a { font-weight: 800; }
 
@@ -683,14 +687,21 @@ footer nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
 
       <div class="row2">
         <div class="field">
-          <label class="l" for="name">Dein Name</label>
-          <input id="name" name="name" type="text" autocomplete="name" placeholder="z. B. Anna Huber">
+          <label class="l" for="name">Dein Name *</label>
+          <input id="name" name="name" type="text" autocomplete="name" placeholder="z. B. Marta Huber" required>
         </div>
         <div class="field">
-          <label class="l" for="anlass">Anlass &amp; Termin</label>
-          <input id="anlass" name="anlass" type="text" placeholder="z. B. Volksfest, Mitte Juli">
+          <label class="l" for="email">Deine E-Mail-Adresse *</label>
+          <input id="email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="z. B. marta@beispiel.de" required>
         </div>
       </div>
+
+      <div class="field">
+        <label class="l" for="anlass">Anlass &amp; Termin</label>
+        <input id="anlass" name="anlass" type="text" placeholder="z. B. Volksfest, Mitte Juli">
+      </div>
+
+      <input type="text" name="_honey" id="honey" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
 
       <div class="field">
         <label class="l" for="wunsch">Farben, Stoff, Ideen</label>
@@ -706,11 +717,11 @@ footer nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
         <div class="btn-row">
           <button class="btn btn-rot" type="submit" id="senden">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
-            Per E-Mail anfragen
+            <span id="senden-text">Anfrage absenden</span>
           </button>
-          <button class="btn" type="button" id="kopieren">Text kopieren</button>
         </div>
         <p class="status" id="status" role="status"></p>
+        <p class="fine" style="margin:0">Du bekommst eine Kopie deiner Anfrage per E-Mail. Deine Angaben nutzen wir nur, um dir zu antworten. Der Versand läuft über den Dienst FormSubmit.</p>
       </div>
     </form>
   </div>
@@ -788,8 +799,10 @@ footer nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
 
 <script>
 (() => {
-  // Hier die echte Adresse eintragen
   const KONTAKT_EMAIL = "anna@gmachtvouns.de";
+  // Versand über FormSubmit (https://formsubmit.co). Beim allerersten Absenden kommt
+  // eine Bestätigungsmail an KONTAKT_EMAIL, die einmal angeklickt werden muss.
+  const FORM_ENDPOINT = "https://formsubmit.co/ajax/" + KONTAKT_EMAIL;
   const DRUCK = 25;
 
   const $ = (s) => document.querySelector(s);
@@ -814,9 +827,6 @@ footer nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
   function text() {
     const f = (id) => $(id).value.trim();
     return [
-      "Servus Anna,",
-      "",
-      "ich interessiere mich für ein Dirndl:",
       "• Variante: " + variante().value,
       "• Größe: " + f("#groesse"),
       "• Anzahl: " + anzahl(),
@@ -824,28 +834,60 @@ footer nav { display: flex; gap: var(--s4); flex-wrap: wrap; }
       f("#anlass") ? "• Anlass/Termin: " + f("#anlass") : "",
       f("#wunsch") ? "• Wünsche: " + f("#wunsch") : "",
       "• Richtpreis laut Seite: " + $("#betrag").textContent + (variante().id === "v-fest" ? " inkl. Stoff" : " zzgl. Stoff"),
-      "",
-      "Viele Grüße",
-      f("#name") || ""
-    ].filter((z, i, a) => z !== "" || a[i - 1] !== "").join("\n");
+    ].filter(Boolean).join("\n");
   }
 
   form.addEventListener("input", rechnen);
   form.addEventListener("change", rechnen);
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const betreff = "Dirndl-Anfrage" + ($("#name").value.trim() ? " von " + $("#name").value.trim() : "");
-    location.href = "mailto:" + KONTAKT_EMAIL + "?subject=" + encodeURIComponent(betreff) + "&body=" + encodeURIComponent(text());
-    status.textContent = "Dein E-Mail-Programm sollte sich jetzt öffnen. Falls nicht: Text kopieren und an " + KONTAKT_EMAIL + " schicken.";
-  });
+  function zeige(text, fehler) {
+    status.textContent = text;
+    status.classList.toggle("fehler", !!fehler);
+  }
 
-  $("#kopieren").addEventListener("click", () => {
-    const t = text();
-    navigator.clipboard?.writeText(t).then(
-      () => { status.textContent = "Kopiert. Füge den Text in eine Mail oder Nachricht ein."; },
-      () => { status.textContent = "Kopieren hat nicht geklappt. Hier der Text zum Markieren:\n" + t; }
-    ) ?? (status.textContent = t);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("#name").value.trim();
+    const email = $("#email").value.trim();
+    if (!name) { zeige("Bitte gib deinen Namen an.", true); $("#name").focus(); return; }
+    if (!$("#email").checkValidity() || !email) { zeige("Bitte gib eine gültige E-Mail-Adresse an, damit wir dir antworten können.", true); $("#email").focus(); return; }
+    if ($("#honey").value) return;
+
+    const knopf = $("#senden");
+    knopf.disabled = true; $("#senden-text").textContent = "Wird gesendet …"; zeige("");
+
+    const daten = {
+      _subject: "Dirndl-Anfrage von " + name,
+      _template: "table",
+      _captcha: "false",
+      _replyto: email,
+      _autoresponse: "Servus " + name + ",\n\nvielen Dank für deine Anfrage! Wir haben sie bekommen und melden uns in ein, zwei Tagen bei dir.\n\nDeine Anfrage:\n" + text() + "\n\nPfiat di,\nAnna & Renate\ngmachtvouns.de",
+      Name: name,
+      Variante: variante().value,
+      "Größe": $("#groesse").value,
+      Anzahl: String(anzahl()),
+      Aufdruck: $("#druck").checked ? "ja (+25 € pro Dirndl)" : "nein",
+      "Anlass & Termin": $("#anlass").value.trim() || "–",
+      "Farben, Stoff, Ideen": $("#wunsch").value.trim() || "–",
+      Richtpreis: $("#betrag").textContent + (variante().id === "v-fest" ? " inkl. Stoff" : " zzgl. Stoff"),
+      email: email
+    };
+
+    try {
+      const res = await fetch(FORM_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(daten)
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.success === false || json.success === "false") throw new Error(json.message || res.status);
+      form.innerHTML = '<div class="danke" role="status"><p class="hand" style="font-size:1.8rem;margin:0">Vergelt’s Gott!</p><h3>Deine Anfrage ist bei uns angekommen.</h3><p>Eine Kopie haben wir dir an <strong></strong> geschickt. Wir melden uns in ein, zwei Tagen.</p></div>';
+      form.querySelector("strong").textContent = email;
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (err) {
+      knopf.disabled = false; $("#senden-text").textContent = "Anfrage absenden";
+      zeige("Das Absenden hat leider nicht geklappt. Schreib uns bitte direkt an " + KONTAKT_EMAIL + ".", true);
+    }
   });
 
   document.querySelectorAll("[data-verein]").forEach((a) => a.addEventListener("click", () => {
