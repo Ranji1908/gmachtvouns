@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /signatur.html
+
+Sitemap: https://gmachtvouns.de/sitemap.xml
